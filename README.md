@@ -169,6 +169,17 @@ While this tool is configured for Claude models out-of-the-box, the routing logi
 
 Open an issue or PR if you want to add patterns, tune the classifier, or add support for other editors. The keyword lists in `model-advisor.sh` are the main thing to tweak.
 
+### Roadmap
+
+**Active Development:**
+- Local model support (Ollama, LM Studio, vLLM) - make the tool work with your local LLM stack, not just Claude
+
+**Blocked on Cursor/Claude Code API:**
+- Model prefix syntax (`haiku:`, `sonnet:`, `opus:` at prompt start) - requires per-request model override capability
+- Plan mode activation prefix - requires programmatic UI state control
+
+See [GitHub Issues](https://github.com/coyvalyss1/model-matchmaker/issues) for details and discussion.
+
 ## License
 
 MIT
