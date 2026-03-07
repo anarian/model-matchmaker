@@ -121,6 +121,34 @@ try:
     }
     with open(log_path, "a") as f:
         f.write(json.dumps(entry) + "\n")
+    
+    # Save block metadata for compliance tracking
+    if block:
+        state_path = os.path.join(log_dir, ".last-block-state.json")
+        block_state = {
+            "conversation_id": conversation_id,
+            "generation_id": generation_id,
+            "blocked_model": model,
+            "recommended_model": rec,
+            "block_ts": datetime.now().isoformat(),
+        }
+        with open(state_path, "w") as f:
+            json.dump(block_state, f)
+        
+        # Check if auto-switch is enabled
+        auto_switch_flag = os.path.join(log_dir, ".auto-switch-enabled")
+        if os.path.exists(auto_switch_flag):
+            # Trigger auto-switch via keyboard automation
+            auto_switch_script = os.path.join(log_dir, "auto-switch-model.sh")
+            if os.path.exists(auto_switch_script):
+                import subprocess
+                try:
+                    subprocess.Popen([auto_switch_script, rec], 
+                                   stdout=subprocess.DEVNULL, 
+                                   stderr=subprocess.DEVNULL,
+                                   start_new_session=True)
+                except:
+                    pass
 except:
     pass
 
