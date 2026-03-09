@@ -92,13 +92,13 @@ The `hooks.json` file uses `python3` as the command. If `python3` isn't recogniz
 
 ```powershell
 # 1. Clone this repo (or just copy the files)
-git clone https://github.com/coyvalyss1/model-matchmaker.git
+git clone https://github.com/anarian/model-matchmaker.git
 
 # 2. Copy files to your Cursor config
-Copy-Item hooks.json $env:USERPROFILE\.cursor\
+Copy-Item model-matchmaker/hooks.json $env:USERPROFILE\.cursor\
 New-Item -ItemType Directory -Force $env:USERPROFILE\.cursor\hooks
-Copy-Item hooks\*.py $env:USERPROFILE\.cursor\hooks\
-Copy-Item hooks\*.ps1 $env:USERPROFILE\.cursor\hooks\
+Copy-Item model-matchmaker/hooks\*.py $env:USERPROFILE\.cursor\hooks\
+Copy-Item model-matchmaker/hooks\*.ps1 $env:USERPROFILE\.cursor\hooks\
 
 # 3. Restart Cursor
 ```
