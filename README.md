@@ -56,11 +56,13 @@ flowchart TD
 
 Three layers work together:
 
-1. **`session-init.sh`** runs at session start and injects model-awareness context so the AI itself knows when to suggest switching
-2. **`model-advisor.sh`** runs before every prompt, classifies the task, and blocks with a recommendation when you're on the wrong model
-3. **`track-completion.sh`** runs when the agent loop ends, logging task outcomes for accuracy analysis
+1. **`session-init.py`** runs at session start and injects model-awareness context so the AI itself knows when to suggest switching
+2. **`model-advisor.py`** runs before every prompt, classifies the task, and blocks with a recommendation when you're on the wrong model
+3. **`track-completion.py`** runs when the agent loop ends, logging task outcomes for accuracy analysis
 
 ## Quick Setup
+
+### macOS / Linux
 
 ```bash
 # 1. Clone this repo (or just copy the files)
@@ -70,18 +72,46 @@ git clone https://github.com/coyvalyss1/model-matchmaker.git
 cp model-matchmaker/hooks.json ~/.cursor/
 mkdir -p ~/.cursor/hooks
 cp model-matchmaker/hooks/*.sh ~/.cursor/hooks/
+cp model-matchmaker/hooks/*.py ~/.cursor/hooks/
 
-# 3. Make scripts executable
+# 3. Make shell scripts executable
 chmod +x ~/.cursor/hooks/*.sh
 
 # 4. Restart Cursor (or Claude Code)
 ```
 
+### Windows
+
+**Prerequisite:** Python 3 must be accessible from your PATH. Verify with:
+```powershell
+python3 --version   # Try this first (Microsoft Store Python, some PATH setups)
+py --version        # Python Launcher — ships with all official python.org installers
+```
+
+The `hooks.json` file uses `python3` as the command. If `python3` isn't recognized on your machine, edit `hooks.json` and change all three `python3` references to `py` (or `python`, whichever resolves on your system).
+
+```powershell
+# 1. Clone this repo (or just copy the files)
+git clone https://github.com/coyvalyss1/model-matchmaker.git
+
+# 2. Copy files to your Cursor config
+Copy-Item hooks.json $env:USERPROFILE\.cursor\
+New-Item -ItemType Directory -Force $env:USERPROFILE\.cursor\hooks
+Copy-Item hooks\*.py $env:USERPROFILE\.cursor\hooks\
+Copy-Item hooks\*.ps1 $env:USERPROFILE\.cursor\hooks\
+
+# 3. Restart Cursor
+```
+
+No `chmod`, no build step. The `.py` scripts run directly with `python3`.
+
 That's it. No packages, no build step, no config files to edit.
 
 ### Enable Auto-Switch (Optional)
 
-Model Matchmaker v2+ can automatically switch models when it blocks a prompt:
+Model Matchmaker v2+ can automatically switch models when it blocks a prompt.
+
+**macOS:**
 
 ```bash
 # Grant Accessibility permissions first
@@ -96,6 +126,23 @@ Model Matchmaker v2+ can automatically switch models when it blocks a prompt:
 # Disable anytime
 ~/.cursor/hooks/toggle-auto-switch.sh off
 ```
+
+**Windows:**
+
+Auto-switch uses PowerShell `SendKeys` — no extra installs required.
+
+```powershell
+# Enable: create the flag file
+New-Item -ItemType File -Force "$env:USERPROFILE\.cursor\hooks\.auto-switch-enabled"
+
+# Disable: delete the flag file
+Remove-Item "$env:USERPROFILE\.cursor\hooks\.auto-switch-enabled" -ErrorAction SilentlyContinue
+
+# Check status
+Test-Path "$env:USERPROFILE\.cursor\hooks\.auto-switch-enabled"
+```
+
+> **Note:** On Windows, `SendKeys` requires the Cursor window to be in the foreground at the moment the switch fires. It is slightly less reliable than the macOS AppleScript approach — if Cursor loses focus just before the switch, the keystrokes may land in the wrong window. Keep Cursor focused when working.
 
 When enabled, the model switches automatically (~1 second) instead of showing a block message. You press Enter to re-send with the new model.
 
@@ -244,56 +291,42 @@ Auto-switch reads `~/.cursor/hooks/.cursor-mode` and adjusts dropdown positions 
 
 **Symptom:** After installing or updating Model Matchmaker, every prompt gets silently blocked. You can't send any messages in Cursor.
 
-**Cause:** The `beforeSubmitPrompt` hook script has a syntax error (usually bash quoting issues) and exits with code 2, which Cursor interprets as "block this prompt."
+**Cause:** The `beforeSubmitPrompt` hook script has a syntax error and exits with code 2, which Cursor interprets as "block this prompt."
 
 **Quick Fix:**
-1. Open `~/.cursor/hooks.json`
+1. Open `~/.cursor/hooks.json` (macOS/Linux) or `%USERPROFILE%\.cursor\hooks.json` (Windows)
 2. Remove or comment out the `beforeSubmitPrompt` section:
    ```json
    {
      "version": 1,
      "hooks": {
        "sessionStart": [
-         { "command": "./hooks/session-init.sh", "timeout": 2 }
+         { "command": "python3 hooks/session-init.py", "timeout": 2 }
        ],
        // "beforeSubmitPrompt": [
-       //   { "command": "./hooks/model-advisor.sh", "timeout": 2 }
+       //   { "command": "python3 hooks/model-advisor.py", "timeout": 2 }
        // ],
        "stop": [
-         { "command": "./hooks/track-completion.sh", "timeout": 2 }
+         { "command": "python3 hooks/track-completion.py", "timeout": 2 }
        ]
      }
    }
    ```
 3. Restart Cursor (or just start a new composer session)
 
-**Root Cause & Prevention:**
-
-The `model-advisor.sh` script embeds Python code inside a bash `python3 -c '...'` heredoc. Certain Python string operations break bash's quoting:
-
-**BAD (breaks bash):**
-```python
-snippet = prompt[:40].replace("\n", " ").replace("\"", "'")
-# The \" inside single-quoted bash string confuses the parser
-```
-
-**GOOD (safe for bash):**
-```python
-snippet = prompt[:40].replace(chr(10), " ").replace(chr(34), chr(39))
-# Using chr() avoids all quoting conflicts
-```
-
-**General rule:** Inside `python3 -c '...'`, avoid:
-- Escaped double quotes (`\"`)
-- Backslash escapes (`\n`, `\t`, etc.) - use `chr()` instead
-- Single quotes in Python strings - use `chr(39)` or double quotes
-
 **Test your hook:**
+
+macOS/Linux:
 ```bash
-echo '{"prompt":"test","model":"claude-4-opus"}' | bash ~/.cursor/hooks/model-advisor.sh
+echo '{"prompt":"test","model":"claude-4-opus"}' | python3 ~/.cursor/hooks/model-advisor.py
 ```
 
-If you see `{"continue": true}` or `{"continue": false, "user_message": "..."}`, it's working. If you see bash errors, check your quoting.
+Windows (PowerShell):
+```powershell
+'{"prompt":"test","model":"claude-4-opus"}' | python3 "$env:USERPROFILE\.cursor\hooks\model-advisor.py"
+```
+
+If you see `{"continue": true}` or `{"continue": false, "user_message": "..."}`, it's working.
 
 ## How This Compares to Other Solutions
 
@@ -339,7 +372,7 @@ Model Matchmaker runs entirely locally. No network calls, no proxy, no attack su
 
 ## Design Decisions
 
-- **Pure bash + python3** for JSON parsing. No external dependencies. python3 is pre-installed on macOS and most Linux.
+- **Pure Python 3** for JSON parsing and classification. No external dependencies. Python 3 is pre-installed on macOS and most Linux; on Windows, install from python.org or the Microsoft Store.
 - **2-second timeout**. If the script hangs, Cursor proceeds normally (fail-open). You're never locked out.
 - **Structured NDJSON logging**. Every event is a JSON line with conversation IDs for correlation. First 40 chars of prompt only.
 - **No LLM calls for classification**. Instant, free, deterministic. Keyword matching is fast and predictable.
@@ -371,56 +404,33 @@ While this tool is configured for Claude models out-of-the-box, the routing logi
 ### Accuracy
 - **12/12 test prompts** from real sessions classified correctly after tuning
 - The log file has been the most interesting part - reviewing it reveals patterns you don't expect; most "build" prompts genuinely don't need Opus
-- Run `./hooks/analytics.sh` to see your personal accuracy metrics: override rate, completion outcomes after overrides, and recommendation distribution
+- Run `./hooks/analytics.sh` (macOS/Linux) to see your personal accuracy metrics: override rate, completion outcomes after overrides, and recommendation distribution
 
 ## Contributing
 
-Open an issue or PR if you want to add patterns, tune the classifier, or add support for other editors. The keyword lists in `model-advisor.sh` are the main thing to tweak.
+Open an issue or PR if you want to add patterns, tune the classifier, or add support for other editors. The keyword lists in `model-advisor.py` are the main thing to tweak.
 
 ### Writing Custom Hooks
 
-If you're extending Model Matchmaker or writing your own Cursor hooks, here are guidelines to avoid the bash quoting trap that can lock users out:
-
-**The Problem:** Hooks use `python3 -c '...'` to embed Python inside bash. The Python code runs inside a bash single-quoted string, so certain Python string operations break the quoting and cause exit code 2 (which Cursor interprets as "block this prompt").
-
-**Safe patterns:**
-
-```python
-# Use chr() for special characters instead of escape sequences
-newline = chr(10)   # instead of "\n"
-quote = chr(34)     # instead of "\""
-apostrophe = chr(39) # instead of "'"
-
-# Safe string operations
-snippet = text[:40].replace(chr(10), " ").replace(chr(34), chr(39))
-```
-
-**Unsafe patterns that break bash:**
-
-```python
-# These will cause syntax errors in the bash heredoc
-snippet = text[:40].replace("\n", " ")  # Backslash escapes break
-snippet = text[:40].replace("\"", "'")  # Escaped quotes break
-snippet = text[:40].replace('"', "'")   # Raw quotes break
-```
+If you're extending Model Matchmaker or writing your own Cursor hooks, write them as standalone Python scripts for cross-platform compatibility. Read from `sys.stdin`, write to `sys.stdout`, and always wrap the whole body in a `try/except` that prints `{"continue": true}` on failure so a bug never locks you out.
 
 **Testing your hook:**
 
+macOS/Linux:
 ```bash
-# Test with sample input
-echo '{"prompt":"test message","model":"claude-4-opus"}' | bash ~/.cursor/hooks/your-hook.sh
-
-# Should output valid JSON like:
-# {"continue": true}
-# or
-# {"continue": false, "user_message": "Blocked because..."}
-
-# If you see bash errors like "unexpected EOF", you have quoting issues
+echo '{"prompt":"test message","model":"claude-4-opus"}' | python3 ~/.cursor/hooks/model-advisor.py
 ```
 
+Windows (PowerShell):
+```powershell
+'{"prompt":"test message","model":"claude-4-opus"}' | python3 "$env:USERPROFILE\.cursor\hooks\model-advisor.py"
+```
+
+Should output valid JSON like `{"continue": true}` or `{"continue": false, "user_message": "..."}`.
+
 **General principles:**
-- Use `chr()` for any character that could conflict with bash quoting
-- Avoid f-strings with quotes inside them
+- Use `pathlib.Path.home()` instead of `os.path.expanduser("~")` — both work cross-platform, but `Path` is cleaner
+- Avoid hardcoded `/` or `\` path separators; use `Path` joins
 - Test standalone before deploying to users
 - Remember: exit code 2 = block, exit code 0 = success, other codes = fail-open (prompt proceeds)
 

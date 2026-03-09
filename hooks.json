@@ -2,13 +2,13 @@
   "version": 1,
   "hooks": {
     "sessionStart": [
-      { "command": "./hooks/session-init.sh", "timeout": 2 }
+      { "command": "py hooks/session-init.py", "timeout": 2 }
     ],
     "beforeSubmitPrompt": [
-      { "command": "./hooks/model-advisor.sh", "timeout": 2 }
+      { "command": "py hooks/model-advisor.py", "timeout": 2 }
     ],
     "stop": [
-      { "command": "./hooks/track-completion.sh", "timeout": 2 }
+      { "command": "py hooks/track-completion.py", "timeout": 2 }
     ]
   }
 }
